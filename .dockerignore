@@ -18,7 +18,6 @@ bootstrap/cache/
 .gitignore
 .gitattributes
 Dockerfile
-docker/
 docker-compose*.yml
 *.sh
 tests/

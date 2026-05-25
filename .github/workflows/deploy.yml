@@ -128,62 +128,50 @@ jobs:
 
   deploy:
     name: Deploy to Production
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, employee-app]
     needs: build
     environment:
       name: production
       url: https://employee.nurulizyansyaza.com
+    permissions:
+      contents: read
+      packages: read
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Deploy
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          GIT_SHA: ${{ github.sha }}
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          set -euo pipefail
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -e
+          DEPLOY_DIR="/opt/employee-app"
+          SHA_TAG="sha-$(echo "${GIT_SHA}" | cut -c1-7)"
 
-            DEPLOY_DIR="/opt/employee-app"
-            REGISTRY="ghcr.io"
-            IMAGE="${REGISTRY}/${{ github.repository }}"
-            SHA_TAG="sha-$(echo ${{ github.sha }} | cut -c1-7)"
+          echo "==> Logging into GitHub Container Registry"
+          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
 
-            echo "==> Logging into GitHub Container Registry"
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${REGISTRY} \
-              -u ${{ github.actor }} --password-stdin
+          echo "==> Pulling new image: ${IMAGE}:${SHA_TAG}"
+          docker pull "${IMAGE}:${SHA_TAG}"
+          docker tag "${IMAGE}:${SHA_TAG}" "${IMAGE}:latest"
 
-            echo "==> Pulling new image: ${IMAGE}:${SHA_TAG}"
-            docker pull "${IMAGE}:${SHA_TAG}"
-            docker tag "${IMAGE}:${SHA_TAG}" "${IMAGE}:latest"
+          cd "${DEPLOY_DIR}"
 
-            echo "==> Deploying application"
-            cd ${DEPLOY_DIR}
+          export APP_IMAGE="${IMAGE}:${SHA_TAG}"
+          COMPOSE="docker compose --env-file .env.production -f docker-compose.prod.yml"
 
-            export APP_IMAGE="${IMAGE}:${SHA_TAG}"
+          $COMPOSE pull app
+          $COMPOSE up -d --remove-orphans --no-recreate postgres
 
-            docker compose -f docker-compose.prod.yml pull app
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans --no-recreate postgres
+          echo "==> Running database migrations"
+          $COMPOSE run --rm --no-deps app php artisan migrate --force
 
-            echo "==> Running database migrations"
-            docker compose -f docker-compose.prod.yml run --rm --no-deps app \
-              php artisan migrate --force
+          echo "==> Updating application container"
+          $COMPOSE up -d app nginx cloudflared
 
-            echo "==> Updating application container"
-            docker compose -f docker-compose.prod.yml up -d app nginx cloudflared
+          echo "==> Pruning dangling images"
+          docker image prune -f
 
-            echo "==> Clearing and warming caches"
-            docker compose -f docker-compose.prod.yml exec -T app \
-              php artisan config:cache
-            docker compose -f docker-compose.prod.yml exec -T app \
-              php artisan route:cache
-            docker compose -f docker-compose.prod.yml exec -T app \
-              php artisan view:cache
-
-            echo "==> Pruning dangling images"
-            docker image prune -f
-
-            echo "==> Deploy complete! $(date)"
+          echo "==> Deploy complete! $(date -u +%FT%TZ)"

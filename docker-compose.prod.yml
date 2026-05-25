@@ -7,6 +7,7 @@ services:
     volumes:
       - app-storage:/var/www/storage/app
       - app-logs:/var/www/storage/logs
+      - app-public:/var/www/public
     networks:
       - internal
     depends_on:
