@@ -37,8 +37,10 @@ RUN docker-php-ext-configure gd --with-jpeg --with-webp --with-freetype \
     && docker-php-ext-install zip \
     && docker-php-ext-install intl
 
-RUN pecl install redis \
+RUN apk add --no-cache --virtual .redis-build-deps $PHPIZE_DEPS \
+    && pecl install redis \
     && docker-php-ext-enable redis \
+    && apk del .redis-build-deps \
     && rm -rf /tmp/pear
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
