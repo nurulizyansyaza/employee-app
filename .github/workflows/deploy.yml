@@ -171,9 +171,20 @@ jobs:
           cd "${DEPLOY_DIR}"
 
           export APP_IMAGE="${IMAGE}:${SHA_TAG}"
-          COMPOSE="docker compose --env-file .env.production -f docker-compose.prod.yml"
 
-          $COMPOSE pull app
+          # Load .env.production into the shell for compose variable substitution
+          # (e.g. ${DB_PASSWORD} in postgres service). If the file is unreadable
+          # because ownership was changed to root via sudo, skip gracefully —
+          # postgres is already running so --no-recreate means the password is unused.
+          if [[ -r .env.production ]]; then
+            set -a
+            # shellcheck disable=SC1091
+            source .env.production
+            set +a
+          fi
+
+          COMPOSE="docker compose -f docker-compose.prod.yml"
+
           $COMPOSE up -d --remove-orphans --no-recreate --wait postgres
 
           echo "==> Waiting for postgres to accept connections"
