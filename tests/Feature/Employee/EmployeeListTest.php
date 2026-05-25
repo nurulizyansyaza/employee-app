@@ -24,7 +24,7 @@ class EmployeeListTest extends TestCase
         Employee::factory()->count(3)->create();
 
         $this->actingAs($this->user)
-            ->getJson('/employees/api/employees')
+            ->getJson('/api/employees')
             ->assertOk()
             ->assertJsonStructure([
                 'data' => [['id', 'name', 'birthdate', 'sex', 'salary', 'currency', 'salary_formatted', 'nik', 'is_active']],
@@ -38,7 +38,7 @@ class EmployeeListTest extends TestCase
         Employee::factory()->create(['name' => 'Bob Jones']);
 
         $response = $this->actingAs($this->user)
-            ->getJson('/employees/api/employees?search=Alice')
+            ->getJson('/api/employees?search=Alice')
             ->assertOk();
 
         $names = collect($response->json('data'))->pluck('name');
@@ -52,7 +52,7 @@ class EmployeeListTest extends TestCase
         Employee::factory()->create(['name' => 'Aaron']);
 
         $response = $this->actingAs($this->user)
-            ->getJson('/employees/api/employees?sort=name&direction=asc')
+            ->getJson('/api/employees?sort=name&direction=asc')
             ->assertOk();
 
         $names = collect($response->json('data'))->pluck('name')->values();

@@ -24,7 +24,7 @@ class EmployeeUpdateTest extends TestCase
         $employee = Employee::factory()->create(['name' => 'Old Name', 'currency' => 'USD']);
 
         $this->actingAs($this->user)
-            ->putJson("/employees/api/employees/{$employee->id}", [
+            ->putJson("/api/employees/{$employee->id}", [
                 'name'      => 'New Name',
                 'birthdate' => $employee->birthdate,
                 'sex'       => $employee->sex,
@@ -45,7 +45,7 @@ class EmployeeUpdateTest extends TestCase
         $employee = Employee::factory()->create(['nik' => '1234567890']);
 
         $this->actingAs($this->user)
-            ->putJson("/employees/api/employees/{$employee->id}", [
+            ->putJson("/api/employees/{$employee->id}", [
                 'name'      => $employee->name,
                 'birthdate' => $employee->birthdate,
                 'sex'       => $employee->sex,

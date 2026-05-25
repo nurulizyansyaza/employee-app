@@ -8,6 +8,6 @@ class EmployeeAuthTest extends TestCase
 {
     public function test_unauthenticated_user_cannot_access_employee_api(): void
     {
-        $this->getJson('/employees/api/employees')->assertUnauthorized();
+        $this->getJson('/api/employees')->assertUnauthorized();
     }
 }

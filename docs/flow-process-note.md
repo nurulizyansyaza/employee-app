@@ -21,11 +21,24 @@ EmployeeForm.vue (modal)
     │  PUT    /api/employees/{id}      (update, NIK immutable)
     │  DELETE /api/employees/{id}      (delete)
     ▼
-EmployeeController -> StoreEmployeeRequest / UpdateEmployeeRequest
-    │ validation (server-side only)
+EmployeeController (thin adapter)
+    │ StoreEmployeeRequest / UpdateEmployeeRequest — validation
+    │ builds DTO (CreateEmployeeData / UpdateEmployeeData)
     ▼
-Employee model -> employees table (Postgres)
+Use Case (Application layer)
+    │  ListEmployeesUseCase  / GetEmployeeUseCase
+    │  CreateEmployeeUseCase / UpdateEmployeeUseCase / DeleteEmployeeUseCase
+    │  all accept/return DTOs or domain objects — no HTTP knowledge
+    ▼
+EmployeeRepositoryInterface (Domain contract)
+    ▼
+EloquentEmployeeRepository (Infrastructure)
+    │  only Eloquent layer that touches the DB
+    ▼
+Employee model -> employees table (PostgreSQL)
 ```
+
+Error handling: `EmployeeNotFoundException` thrown by use cases is caught by the global exception handler in `bootstrap/app.php` and rendered as `{ message }` 404 — no try/catch in the controller.
 
 Validation strategy: the Vue form holds **no** HTML5 constraints. The server returns `422 { errors: { field: [msg] } }` and the form's `fieldError(key)` renders the first message under each input.
 
@@ -94,12 +107,41 @@ php artisan serve
 # OCR_PROVIDER=fake by default — no external calls
 ```
 
-## 7. Test coverage snapshot
+## 7. Architecture layers (Clean / Hexagonal)
 
-`php artisan test` runs **56 tests** (19 unit + 37 feature) covering:
+```
+app/
+├── Domain/Employee/
+│   ├── EmployeeRepositoryInterface.php   # pure PHP contract
+│   └── Exceptions/
+│       └── EmployeeNotFoundException.php
+├── Application/Employee/
+│   ├── DTO/
+│   │   ├── EmployeeListCriteria.php
+│   │   ├── CreateEmployeeData.php
+│   │   └── UpdateEmployeeData.php
+│   ├── ListEmployeesUseCase.php
+│   ├── GetEmployeeUseCase.php
+│   ├── CreateEmployeeUseCase.php
+│   ├── UpdateEmployeeUseCase.php
+│   └── DeleteEmployeeUseCase.php
+├── Infrastructure/Persistence/
+│   └── EloquentEmployeeRepository.php   # implements Domain interface
+└── Http/
+    ├── Controllers/Api/EmployeeController.php  # thin adapter
+    ├── Requests/{Store,Update}EmployeeRequest.php
+    └── Resources/EmployeeResource.php
+```
 
-- **Unit**: `PlateNormalizerTest` — 18 cases for normalize, matchesFormat, extractPlate
+Binding: `AppServiceProvider::register()` — `EmployeeRepositoryInterface` → `EloquentEmployeeRepository`
+Exception handler: `bootstrap/app.php` — `EmployeeNotFoundException` → 404 JSON
+
+## 8. Test coverage snapshot
+
+`php artisan test` runs **62 tests** (24 unit + 38 feature) covering:
+
+- **Unit / Employee**: `ListEmployeesUseCaseTest`, `GetEmployeeUseCaseTest`, `CreateEmployeeUseCaseTest`, `DeleteEmployeeUseCaseTest` — use Mockery, BDD-style test names, zero DB I/O
+- **Unit / OCR**: `PlateNormalizerTest` — 18 cases for normalize, matchesFormat, extractPlate
 - **Feature / Auth**: registration, login, password reset, email verification, password update (18 tests)
-- **Feature / Employee**: auth gate, search, sort, paginate, create (with currency), update (NIK immutable), delete, 404/422 paths (13 tests)
+- **Feature / Employee**: auth gate, search, sort, paginate, create (with currency), show, update (NIK immutable), delete, 404/422 paths (15 tests)
 - **Feature / Profile**: edit, update, delete account (5 tests)
-- **Feature / Other**: basic HTTP smoke test (1 test)

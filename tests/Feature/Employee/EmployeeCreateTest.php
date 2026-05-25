@@ -33,7 +33,7 @@ class EmployeeCreateTest extends TestCase
         ];
 
         $this->actingAs($this->user)
-            ->postJson('/employees/api/employees', $payload)
+            ->postJson('/api/employees', $payload)
             ->assertCreated()
             ->assertJsonPath('data.name', 'John Doe')
             ->assertJsonPath('data.nik', '1234567890')
@@ -55,7 +55,7 @@ class EmployeeCreateTest extends TestCase
         ];
 
         $this->actingAs($this->user)
-            ->postJson('/employees/api/employees', $payload)
+            ->postJson('/api/employees', $payload)
             ->assertCreated()
             ->assertJsonPath('data.currency', 'USD');
 
@@ -65,7 +65,7 @@ class EmployeeCreateTest extends TestCase
     public function test_invalid_currency_code_returns_422(): void
     {
         $this->actingAs($this->user)
-            ->postJson('/employees/api/employees', [
+            ->postJson('/api/employees', [
                 'name'      => 'Bad Currency',
                 'birthdate' => '1990-01-01',
                 'sex'       => true,
@@ -81,7 +81,7 @@ class EmployeeCreateTest extends TestCase
     public function test_creating_employee_with_missing_required_fields_returns_422(): void
     {
         $this->actingAs($this->user)
-            ->postJson('/employees/api/employees', [])
+            ->postJson('/api/employees', [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['name', 'birthdate', 'salary', 'nik']);
     }
@@ -91,7 +91,7 @@ class EmployeeCreateTest extends TestCase
         Employee::factory()->create(['nik' => '9999999999']);
 
         $this->actingAs($this->user)
-            ->postJson('/employees/api/employees', [
+            ->postJson('/api/employees', [
                 'name'      => 'Duplicate NIK',
                 'birthdate' => '1990-01-01',
                 'sex'       => true,

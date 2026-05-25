@@ -8,12 +8,19 @@ use App\Services\Ocr\Drivers\GroqPlateDriver;
 use App\Services\Ocr\Drivers\OpenAiPlateDriver;
 use App\Services\Ocr\PlateNormalizer;
 use App\Services\Ocr\PlateOcrDriver;
+use App\Domain\Employee\EmployeeRepositoryInterface;
+use App\Infrastructure\Persistence\EloquentEmployeeRepository;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->bind(
+            EmployeeRepositoryInterface::class,
+            EloquentEmployeeRepository::class,
+        );
+
         $this->app->singleton(PlateNormalizer::class);
 
         $this->app->bind(PlateOcrDriver::class, function () {

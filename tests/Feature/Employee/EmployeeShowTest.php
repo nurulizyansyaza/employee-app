@@ -24,7 +24,7 @@ class EmployeeShowTest extends TestCase
         $employee = Employee::factory()->create();
 
         $this->actingAs($this->user)
-            ->getJson("/employees/api/employees/{$employee->id}")
+            ->getJson("/api/employees/{$employee->id}")
             ->assertOk()
             ->assertJsonPath('data.id', $employee->id);
     }
@@ -32,7 +32,7 @@ class EmployeeShowTest extends TestCase
     public function test_viewing_nonexistent_employee_returns_404(): void
     {
         $this->actingAs($this->user)
-            ->getJson('/employees/api/employees/NONEXISTENT')
+            ->getJson('/api/employees/NONEXISTENT')
             ->assertNotFound();
     }
 }

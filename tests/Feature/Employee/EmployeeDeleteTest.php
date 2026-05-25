@@ -24,7 +24,7 @@ class EmployeeDeleteTest extends TestCase
         $employee = Employee::factory()->create();
 
         $this->actingAs($this->user)
-            ->deleteJson("/employees/api/employees/{$employee->id}")
+            ->deleteJson("/api/employees/{$employee->id}")
             ->assertOk()
             ->assertJsonStructure(['message']);
 
@@ -34,7 +34,7 @@ class EmployeeDeleteTest extends TestCase
     public function test_deleting_nonexistent_employee_returns_404(): void
     {
         $this->actingAs($this->user)
-            ->deleteJson('/employees/api/employees/NONEXISTENT')
+            ->deleteJson('/api/employees/NONEXISTENT')
             ->assertNotFound();
     }
 }

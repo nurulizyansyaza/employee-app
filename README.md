@@ -2,6 +2,40 @@
 
 Employee management app with OCR-driven license plate / NIK capture.
 
+## Architecture
+
+This project follows **Clean / Hexagonal Architecture** with four distinct layers.
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  Interface (HTTP)          app/Http/                           │
+│  Thin controllers, FormRequests, API Resources                 │
+├────────────────────────────────────────────────────────────────┤
+│  Application               app/Application/                    │
+│  Use cases (ListEmployees, GetEmployee, Create, Update, Delete)│
+│  DTOs (EmployeeListCriteria, CreateEmployeeData, …)            │
+├────────────────────────────────────────────────────────────────┤
+│  Domain                    app/Domain/                         │
+│  EmployeeRepositoryInterface, EmployeeNotFoundException        │
+│  No framework dependencies — pure PHP contracts                │
+├────────────────────────────────────────────────────────────────┤
+│  Infrastructure            app/Infrastructure/                 │
+│  EloquentEmployeeRepository — the only place that touches DB   │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Dependency direction**: `HTTP → Application → Domain ← Infrastructure`
+
+| Layer | Location | Responsibility |
+| ----- | -------- | -------------- |
+| Domain | `app/Domain/Employee/` | Repository contract + domain exceptions |
+| Application | `app/Application/Employee/` | Use cases + DTOs (framework-free orchestration) |
+| Infrastructure | `app/Infrastructure/Persistence/` | Eloquent implementation of the repository |
+| Interface | `app/Http/Controllers/Api/`, `Requests/`, `Resources/` | HTTP ↔ application translation |
+
+`AppServiceProvider` binds `EmployeeRepositoryInterface → EloquentEmployeeRepository`.
+`bootstrap/app.php` converts `EmployeeNotFoundException` to a `404` JSON response automatically.
+
 ## Quick start
 
 ```bash
@@ -109,9 +143,9 @@ php artisan test
 vendor/bin/phpunit
 ```
 
-The test suite uses an in-memory sqlite database (see `phpunit.xml`) so Postgres isn't required to run it.
+The test suite runs against PostgreSQL (the SQLite in-memory lines in `phpunit.xml` are commented out).
 
-Test breakdown: **56 tests** — 19 unit (PlateNormalizer) + 37 feature (auth, profile, employee CRUD, OCR validation paths).
+Test breakdown: **62 tests** — 24 unit (PlateNormalizer + Employee use cases) + 38 feature (auth, profile, employee CRUD, OCR validation paths).
 
 ## Useful commands
 

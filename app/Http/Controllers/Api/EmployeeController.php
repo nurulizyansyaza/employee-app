@@ -1,7 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
+use App\Application\Employee\CreateEmployeeUseCase;
+use App\Application\Employee\DeleteEmployeeUseCase;
+use App\Application\Employee\DTO\CreateEmployeeData;
+use App\Application\Employee\DTO\EmployeeListCriteria;
+use App\Application\Employee\DTO\UpdateEmployeeData;
+use App\Application\Employee\GetEmployeeUseCase;
+use App\Application\Employee\ListEmployeesUseCase;
+use App\Application\Employee\UpdateEmployeeUseCase;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
@@ -12,34 +22,29 @@ use Illuminate\Http\Request;
 
 class EmployeeController extends Controller
 {
-    private const SORTABLE = ['id', 'name', 'birthdate', 'sex', 'salary', 'nik', 'is_active'];
+    public function __construct(
+        private readonly ListEmployeesUseCase $listEmployees,
+        private readonly GetEmployeeUseCase $getEmployee,
+        private readonly CreateEmployeeUseCase $createEmployee,
+        private readonly UpdateEmployeeUseCase $updateEmployee,
+        private readonly DeleteEmployeeUseCase $deleteEmployee,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
-        $perPage = (int) $request->input('per_page', 10);
-        $perPage = max(1, min($perPage, 100));
-
-        $sort = in_array($request->input('sort'), self::SORTABLE, true)
-            ? $request->input('sort')
-            : 'name';
-
+        $perPage = max(1, min((int) $request->input('per_page', 10), 100));
         $direction = strtolower((string) $request->input('direction')) === 'desc' ? 'desc' : 'asc';
-
+        $sort = (string) $request->input('sort', 'name');
         $search = trim((string) $request->input('search', ''));
 
-        $query = Employee::query();
+        $criteria = new EmployeeListCriteria(
+            perPage: $perPage,
+            sort: $sort,
+            direction: $direction,
+            search: $search,
+        );
 
-        if ($search !== '') {
-            $like = '%' . $search . '%';
-            $query->where(function ($q) use ($like) {
-                $q->where('name', 'like', $like)
-                    ->orWhere('nik', 'like', $like)
-                    ->orWhere('address', 'like', $like)
-                    ->orWhere('id', 'like', $like);
-            });
-        }
-
-        $paginator = $query->orderBy($sort, $direction)->paginate($perPage);
+        $paginator = $this->listEmployees->execute($criteria);
 
         return response()->json([
             'data' => $paginator->getCollection()->map(fn (Employee $e) => EmployeeResource::make($e)),
@@ -59,7 +64,9 @@ class EmployeeController extends Controller
 
     public function store(StoreEmployeeRequest $request): JsonResponse
     {
-        $employee = Employee::create($request->validated());
+        $employee = $this->createEmployee->execute(
+            CreateEmployeeData::fromArray($request->validated()),
+        );
 
         return response()->json([
             'data'    => EmployeeResource::make($employee->fresh()),
@@ -69,27 +76,27 @@ class EmployeeController extends Controller
 
     public function show(string $id): JsonResponse
     {
-        $employee = Employee::findOrFail($id);
+        $employee = $this->getEmployee->execute($id);
 
         return response()->json(['data' => EmployeeResource::make($employee)]);
     }
 
     public function update(UpdateEmployeeRequest $request, string $id): JsonResponse
     {
-        $employee = Employee::findOrFail($id);
-        $employee->fill($request->validated())->save();
+        $employee = $this->updateEmployee->execute(
+            $id,
+            UpdateEmployeeData::fromArray($request->validated()),
+        );
 
         return response()->json([
-            'data'    => EmployeeResource::make($employee->fresh()),
+            'data'    => EmployeeResource::make($employee),
             'message' => "Employee {$employee->name} has been updated.",
         ]);
     }
 
     public function destroy(string $id): JsonResponse
     {
-        $employee = Employee::findOrFail($id);
-        $name = $employee->name;
-        $employee->delete();
+        $name = $this->deleteEmployee->execute($id);
 
         return response()->json([
             'message' => "Employee {$name} has been deleted.",
