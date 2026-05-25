@@ -163,7 +163,21 @@ jobs:
           COMPOSE="docker compose --env-file .env.production -f docker-compose.prod.yml"
 
           $COMPOSE pull app
-          $COMPOSE up -d --remove-orphans --no-recreate postgres
+          $COMPOSE up -d --remove-orphans --no-recreate --wait postgres
+
+          echo "==> Waiting for postgres to accept connections"
+          for i in $(seq 1 30); do
+            if $COMPOSE exec -T postgres pg_isready -U "${DB_USERNAME:-employee}" -d "${DB_DATABASE:-employee_app}" >/dev/null 2>&1; then
+              echo "Postgres is ready"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "Postgres failed to become ready in time" >&2
+              $COMPOSE logs postgres
+              exit 1
+            fi
+            sleep 2
+          done
 
           echo "==> Running database migrations"
           $COMPOSE run --rm --no-deps app php artisan migrate --force
