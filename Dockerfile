@@ -28,16 +28,14 @@ RUN apk add --no-cache \
 
 RUN docker-php-ext-configure gd --with-jpeg --with-webp --with-freetype \
     && docker-php-ext-configure intl \
-    && docker-php-ext-install \
-        pdo_pgsql \
-        pgsql \
-        exif \
-        pcntl \
-        bcmath \
-        gd \
-        zip \
-        opcache \
-        intl
+    && docker-php-ext-install pdo_pgsql \
+    && docker-php-ext-install pgsql \
+    && docker-php-ext-install exif \
+    && docker-php-ext-install pcntl \
+    && docker-php-ext-install bcmath \
+    && docker-php-ext-install gd \
+    && docker-php-ext-install zip \
+    && docker-php-ext-install intl
 
 RUN pecl install redis \
     && docker-php-ext-enable redis \
