@@ -147,7 +147,7 @@ jobs:
           DEPLOY_DIR="/opt/employee-app"
           mkdir -p "${DEPLOY_DIR}"
           install -m 0644 docker-compose.prod.yml "${DEPLOY_DIR}/docker-compose.prod.yml"
-          rsync -a --delete docker/ "${DEPLOY_DIR}/docker/"
+          rsync -rlpt --delete --no-group --no-owner docker/ "${DEPLOY_DIR}/docker/"
 
       - name: Deploy
         env:
