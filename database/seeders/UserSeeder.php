@@ -25,6 +25,10 @@ class UserSeeder extends Seeder
         ];
 
         foreach($users as $user) {
+            if (DB::table('users')->where('email', $user['email'])->exists()) {
+                continue;
+            }
+
             $uuid = Str::uuid();
 
             while(DB::table('users')->where('uuid',$uuid)->first()) {
