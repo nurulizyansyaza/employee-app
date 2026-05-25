@@ -54,6 +54,9 @@ COPY . .
 
 COPY --from=node-builder /app/public/build ./public/build
 
+RUN mkdir -p bootstrap/cache storage/framework/cache/data storage/framework/sessions storage/framework/views storage/framework/testing storage/logs storage/app/public \
+    && chmod -R 775 bootstrap/cache storage
+
 RUN composer dump-autoload --optimize --no-dev
 
 COPY docker/php/www.conf /usr/local/etc/php-fpm.d/www.conf
