@@ -214,10 +214,10 @@ jobs:
           $COMPOSE run --rm --no-deps app php artisan migrate --force
 
           echo "==> Updating application container"
-          $COMPOSE up -d app --remove-orphans --wait
+          $COMPOSE up -d --no-deps app --remove-orphans --wait
 
           echo "==> Updating nginx container"
-          $COMPOSE up -d nginx --force-recreate --remove-orphans
+          $COMPOSE up -d --no-deps nginx --force-recreate --remove-orphans
 
           echo "==> Pruning dangling images"
           docker image prune -f
