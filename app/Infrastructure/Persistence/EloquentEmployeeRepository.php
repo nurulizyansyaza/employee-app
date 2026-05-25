@@ -11,7 +11,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 final class EloquentEmployeeRepository implements EmployeeRepositoryInterface
 {
-    private const SORTABLE = ['id', 'name', 'birthdate', 'sex', 'salary', 'nik', 'is_active'];
+    private const SORTABLE = ['id', 'name', 'birthdate', 'sex', 'salary', 'currency', 'nik', 'is_active'];
 
     public function findById(string $id): ?Employee
     {
