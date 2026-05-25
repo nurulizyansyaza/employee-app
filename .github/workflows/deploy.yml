@@ -145,9 +145,9 @@ jobs:
         run: |
           set -euo pipefail
           DEPLOY_DIR="/opt/employee-app"
-          sudo mkdir -p "${DEPLOY_DIR}"
-          sudo install -m 0644 docker-compose.prod.yml "${DEPLOY_DIR}/docker-compose.prod.yml"
-          sudo rsync -a --delete docker/ "${DEPLOY_DIR}/docker/"
+          mkdir -p "${DEPLOY_DIR}"
+          install -m 0644 docker-compose.prod.yml "${DEPLOY_DIR}/docker-compose.prod.yml"
+          rsync -a --delete docker/ "${DEPLOY_DIR}/docker/"
 
       - name: Deploy
         env:
