@@ -138,6 +138,17 @@ jobs:
       packages: read
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Sync deploy assets to deploy directory
+        run: |
+          set -euo pipefail
+          DEPLOY_DIR="/opt/employee-app"
+          sudo mkdir -p "${DEPLOY_DIR}"
+          sudo install -m 0644 docker-compose.prod.yml "${DEPLOY_DIR}/docker-compose.prod.yml"
+          sudo rsync -a --delete docker/ "${DEPLOY_DIR}/docker/"
+
       - name: Deploy
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

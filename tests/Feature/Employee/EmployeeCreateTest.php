@@ -103,4 +103,31 @@ class EmployeeCreateTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['nik']);
     }
+
+    public function test_id_rolls_over_to_next_month_when_current_month_is_full(): void
+    {
+        $currentPrefix = now()->format('Ym');
+        $nextPrefix    = now()->addMonth()->format('Ym');      
+
+        Employee::factory()->create(['id' => $currentPrefix . '99999']);
+
+        $nextId = Employee::generateNextId();
+
+        $this->assertStringStartsWith($nextPrefix, $nextId);
+        $this->assertEquals($nextPrefix . '00001', $nextId);
+        $this->assertSame(11, strlen($nextId));
+    }
+
+    public function test_id_generation_stays_within_current_month_when_not_full(): void
+    {
+        $prefix = now()->format('Ym');
+
+        Employee::factory()->create(['id' => $prefix . '00001']);
+        Employee::factory()->create(['id' => $prefix . '00002']);
+
+        $nextId = Employee::generateNextId();
+
+        $this->assertEquals($prefix . '00003', $nextId);
+        $this->assertSame(11, strlen($nextId));
+    }
 }

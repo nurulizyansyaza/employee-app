@@ -59,18 +59,26 @@ class Employee extends Model
 
     public static function generateNextId(): string
     {
-        $prefix = now()->format('Ym');
+        return DB::transaction(function () {
+            $currentDate = now()->copy();
 
-        return DB::transaction(function () use ($prefix) {
-            $last = static::query()
-                ->where('id', 'like', $prefix . '%')
-                ->lockForUpdate()
-                ->orderByDesc('id')
-                ->value('id');
+            while (true) {
+                $prefix = $currentDate->format('Ym');
 
-            $next = $last ? ((int) substr($last, 6)) + 1 : 1;
+                $last = static::query()
+                    ->where('id', 'like', $prefix . '%')
+                    ->lockForUpdate()
+                    ->orderByDesc('id')
+                    ->value('id');
 
-            return $prefix . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+                $next = $last ? ((int) substr($last, 6)) + 1 : 1;
+
+                if ($next <= 99_999) {
+                    return $prefix . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+                }
+
+                $currentDate->addMonth();
+            }
         });
     }
 }
