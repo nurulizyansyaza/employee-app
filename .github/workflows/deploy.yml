@@ -170,6 +170,15 @@ jobs:
 
           cd "${DEPLOY_DIR}"
 
+          # Restore .env.production ownership if a root-level edit (e.g. sudo cp /
+          # sudo tee) changed it to root:root 600. Docker Compose reads this file
+          # for the 'env_file:' directive on the app service; if it is unreadable
+          # the migration run will fail with "permission denied".
+          if [[ -f "${DEPLOY_DIR}/.env.production" && ! -r "${DEPLOY_DIR}/.env.production" ]]; then
+            echo "==> .env.production not readable by $(id -un) — restoring ownership"
+            sudo /usr/bin/chown "$(id -un):$(id -un)" "${DEPLOY_DIR}/.env.production"
+          fi
+
           export APP_IMAGE="${IMAGE}:${SHA_TAG}"
 
           # Load .env.production into the shell for compose variable substitution

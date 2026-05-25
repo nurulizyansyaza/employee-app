@@ -124,6 +124,17 @@ else
     echo "  ${DEPLOY_DIR}/.env.production already exists — not overwriting."
 fi
 
+SUDOERS_FILE="/etc/sudoers.d/90-github-runner-deploy"
+if [[ ! -f "${SUDOERS_FILE}" ]]; then
+    cat > "${SUDOERS_FILE}" <<SUDOEOF
+# Allow ${RUNNER_USER} to restore .env.production ownership during CI deploys.
+# Required when the file ownership is changed to root by a manual sudo edit.
+${RUNNER_USER} ALL=(root) NOPASSWD: /usr/bin/chown ${RUNNER_USER}:${RUNNER_USER} ${DEPLOY_DIR}/.env.production
+SUDOEOF
+    chmod 440 "${SUDOERS_FILE}"
+    echo "  Sudoers rule written to ${SUDOERS_FILE}"
+fi
+
 chown -R "${RUNNER_USER}:${RUNNER_USER}" "${DEPLOY_DIR}"
 
 ###############################################################################
