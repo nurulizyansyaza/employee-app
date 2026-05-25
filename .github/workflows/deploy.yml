@@ -52,7 +52,7 @@ jobs:
           restore-keys: composer-
 
       - name: Install Composer dependencies
-        run: composer install --no-dev --prefer-dist --no-interaction
+        run: composer install --prefer-dist --no-interaction
 
       - name: Copy environment file
         run: cp .env.example .env
