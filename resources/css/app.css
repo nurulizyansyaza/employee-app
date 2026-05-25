@@ -1,0 +1,13 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+
+@source '../views';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+    --min-height-screen: calc(var(--vh, 1vh) * 100);
+    --height-screen: calc(var(--vh, 1vh) * 100);
+}
