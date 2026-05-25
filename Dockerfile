@@ -8,7 +8,7 @@ RUN npm ci --frozen-lockfile
 COPY . .
 RUN npm run build
 
-FROM php:8.3-fpm-alpine AS production
+FROM php:8.5-fpm-alpine AS production
 
 RUN apk add --no-cache \
     git \
