@@ -194,7 +194,7 @@ jobs:
           $COMPOSE run --rm --no-deps app php artisan migrate --force
 
           echo "==> Updating application container"
-          $COMPOSE up -d app nginx cloudflared
+          $COMPOSE up -d app nginx --remove-orphans
 
           echo "==> Pruning dangling images"
           docker image prune -f

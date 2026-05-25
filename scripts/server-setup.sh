@@ -59,13 +59,14 @@ else
 fi
 
 ###############################################################################
-# 3. Firewall (deny all inbound — Cloudflare Tunnel handles ingress)
+# 3. Firewall (allow SSH + HTTP; Cloudflare Proxy handles HTTPS)
 ###############################################################################
-echo "[3/7] Configuring UFW (deny all inbound except SSH)..."
+echo "[3/7] Configuring UFW..."
 ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow ssh
+ufw allow 80/tcp
 ufw --force enable
 
 ###############################################################################
@@ -116,7 +117,6 @@ QUEUE_CONNECTION=database
 
 MAIL_MAILER=log
 
-CLOUDFLARE_TUNNEL_TOKEN=CHANGE_THIS_TUNNEL_TOKEN
 ENVEOF
     chmod 600 "${DEPLOY_DIR}/.env.production"
     echo "  Created ${DEPLOY_DIR}/.env.production (edit it before first deploy!)"
@@ -185,13 +185,10 @@ echo "      APP_KEY    — generate with:"
 echo "        docker run --rm ghcr.io/nurulizyansyaza/employee-app:latest \\"
 echo "          php artisan key:generate --show"
 echo "      DB_PASSWORD — set a strong password"
-echo "      CLOUDFLARE_TUNNEL_TOKEN — from Cloudflare Zero Trust dashboard"
 echo ""
-echo " B. Cloudflare Tunnel setup (one-time, in browser):"
-echo "      https://one.dash.cloudflare.com → Networks → Tunnels"
-echo "      1. Create tunnel named: employee-app"
-echo "      2. Copy the token → paste into .env.production"
-echo "      3. Public Hostname: employee.nurulizyansyaza.com → HTTP → nginx:80"
+echo " B. Cloudflare DNS setup (one-time, in Cloudflare dashboard):"
+echo "      1. Add A record: employee → <server-public-IP>, proxy enabled (orange cloud)"
+echo "      2. SSL/TLS mode: Flexible"
 echo ""
 echo " C. Register the runner (see commands printed in step [6/7] above)."
 echo ""
