@@ -13,5 +13,5 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('throttle:5,1')
         ->name('api.employees.ocr.plate');
 
-    Route::apiResource('employees', EmployeeController::class);
+    Route::apiResource('employees', EmployeeController::class)->names('api.employees');
 });
