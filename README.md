@@ -2,6 +2,13 @@
 
 A Laravel + Vue SPA for managing employees. The interesting bit: you can snap a photo of a license plate or ID card and it'll try to read the NIK for you using your choice of AI vision model (OpenAI, Gemini, Groq or a local fake for dev).
 
+## Login
+
+| Field | Value |
+| ----- | ----- |
+| Email | `admin@email.com` |
+| Password | `admin123` |
+
 ## Getting started
 
 ```bash
