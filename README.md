@@ -82,7 +82,7 @@ Validation is entirely server-side (`StoreEmployeeRequest`, `UpdateEmployeeReque
 
 ## Architecture
 
-The app is structured around Clean / Hexagonal Architecture. The idea is that the core logic has no idea Laravel even exists.
+The app is structured around Clean / Hexagonal Architecture. The core logic is completely framework-agnostic as it has zero knowledge of Laravel and can run in any environment without modification.
 
 ```
 HTTP layer       app/Http/                    thin controllers, FormRequests, Resources
@@ -91,7 +91,7 @@ Domain           app/Domain/Employee/         repository interface + exceptions 
 Infrastructure   app/Infrastructure/          EloquentEmployeeRepository — only DB code
 ```
 
-`AppServiceProvider` wires up `EmployeeRepositoryInterface → EloquentEmployeeRepository`. `EmployeeNotFoundException` is caught globally in `bootstrap/app.php` and turned into a 404 — no try/catch needed in controllers.
+`AppServiceProvider` wires up `EmployeeRepositoryInterface → EloquentEmployeeRepository`. `EmployeeNotFoundException` is caught globally in `bootstrap/app.php` and turned into a 404, so no try/catch needed in controllers.
 
 ## Data model
 
@@ -147,7 +147,7 @@ Validation errors come back as `422 { errors: { field: [messages] } }`. The Vue 
 
 `PlateOcrUpload.vue` lets you pick an image. It POSTs to `/api/ocr/plate` (public) or `/api/employees/ocr/plate` (auth). The controller validates the upload, resolves the right driver from `OCR_PROVIDER`, calls it and returns the result. If it works, the form auto-fills the NIK and name fields.
 
-The `fake` driver just returns a hardcoded response, it is useful for local dev and tests where you don't want real API calls. Swap to `openai`, `gemini` or `groq` when you actually need it to read something.
+The `fake` driver just returns a hardcoded response, it is useful for local dev and tests where you don't want real API calls. Swap to `openai`, `gemini` or `groq` when you actually need it to read something. `groq` is the recommended choice for real usage since it is currently free while `openai` and `gemini` both require billing to be enabled before you can use them.
 
 ## Database and Test Data
 
