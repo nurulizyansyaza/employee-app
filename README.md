@@ -1,325 +1,155 @@
 # Employee App
 
-Employee management app with OCR-driven license plate / NIK capture.
+A Laravel + Vue SPA for managing employees. The interesting bit: you can snap a photo of a license plate or ID card and it'll try to read the NIK for you using your choice of AI vision model (OpenAI, Gemini, Groq or a local fake for dev).
 
-## Architecture
-
-This project follows **Clean / Hexagonal Architecture** with four distinct layers.
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│  Interface (HTTP)          app/Http/                           │
-│  Thin controllers, FormRequests, API Resources                 │
-├────────────────────────────────────────────────────────────────┤
-│  Application               app/Application/                    │
-│  Use cases (ListEmployees, GetEmployee, Create, Update, Delete)│
-│  DTOs (EmployeeListCriteria, CreateEmployeeData, …)            │
-├────────────────────────────────────────────────────────────────┤
-│  Domain                    app/Domain/                         │
-│  EmployeeRepositoryInterface, EmployeeNotFoundException        │
-│  No framework dependencies — pure PHP contracts                │
-├────────────────────────────────────────────────────────────────┤
-│  Infrastructure            app/Infrastructure/                 │
-│  EloquentEmployeeRepository — the only place that touches DB   │
-└────────────────────────────────────────────────────────────────┘
-```
-
-**Dependency direction**: `HTTP → Application → Domain ← Infrastructure`
-
-| Layer | Location | Responsibility |
-| ----- | -------- | -------------- |
-| Domain | `app/Domain/Employee/` | Repository contract + domain exceptions |
-| Application | `app/Application/Employee/` | Use cases + DTOs (framework-free orchestration) |
-| Infrastructure | `app/Infrastructure/Persistence/` | Eloquent implementation of the repository |
-| Interface | `app/Http/Controllers/Api/`, `Requests/`, `Resources/` | HTTP ↔ application translation |
-
-`AppServiceProvider` binds `EmployeeRepositoryInterface → EloquentEmployeeRepository`.
-`bootstrap/app.php` converts `EmployeeNotFoundException` to a `404` JSON response automatically.
-
-## Quick start
+## Getting started
 
 ```bash
-# 1. Install dependencies
-composer install
-npm install
+composer install && npm install
 
-# 2. Configure environment
 cp .env.example .env
 php artisan key:generate
-# edit .env -> set DB_DATABASE / DB_USERNAME / DB_PASSWORD for your Postgres
-# OCR_PROVIDER=fake is fine for local dev
+# Set DB_DATABASE / DB_USERNAME / DB_PASSWORD to point at your Postgres instance
+# OCR_PROVIDER=fake works out of the box — no API keys needed locally
 
-# 3. Create the database (one-time)
-createdb employee_app_local
-
-# 4. Run migrations + seeders
+createdb employee_app_local   # one-time
 php artisan migrate:fresh --seed
 
-# 5. Build frontend (or use `npm run dev` for HMR)
-npm run build
-
-# 6. Serve
-php artisan serve
-# open http://127.0.0.1:8000
+npm run dev       # Vite + HMR
+php artisan serve # http://127.0.0.1:8000
 ```
 
-## Default routes
+## OCR
 
-| Method | Path | Auth | Notes |
-| ------ | ---- | ---- | ----- |
-| GET    | `/`                      | public | landing |
-| GET    | `/login`, `/register`    | public | Breeze auth |
-| GET    | `/employees`             | auth   | SPA shell (Vue) |
-| GET    | `/api/employees`              | auth | list (search, sort, paginate) |
-| GET    | `/api/employees/{id}`         | auth | show single |
-| POST   | `/api/employees`              | auth | create |
-| PUT    | `/api/employees/{id}`         | auth | update |
-| DELETE | `/api/employees/{id}`         | auth | delete |
-| POST   | `/api/ocr/plate`              | public, `throttle:5,1` | OCR plate → JSON |
-| POST   | `/api/employees/ocr/plate`    | auth, `throttle:5,1`   | same OCR, auth-gated |
-
-## OCR provider
-
-Switch via `.env`:
+Upload a JPEG or PNG (max 5 MB) and the app returns the plate/NIK text. Swap providers in `.env`:
 
 ```env
-# Stub provider returns a deterministic fake result. Use for local dev/tests.
-OCR_PROVIDER=fake
+OCR_PROVIDER=fake    # default — returns a canned response, no external calls
 
-# OpenAI GPT-4o vision:
 OCR_PROVIDER=openai
 OPENAI_API_KEY=sk-...
-OPENAI_OCR_MODEL=gpt-4o-mini          # optional
+OPENAI_OCR_MODEL=gpt-4o   # optional
 
-# Google Gemini vision (free tier: ~15 req/min via AI Studio):
 OCR_PROVIDER=gemini
 GEMINI_API_KEY=...
-GEMINI_OCR_MODEL=gemini-2.0-flash     # optional
+GEMINI_OCR_MODEL=gemini-2.0-flash   # optional
 
-# Groq (OpenAI-compatible, fast inference):
 OCR_PROVIDER=groq
 GROQ_API_KEY=gsk_...
 GROQ_OCR_MODEL=meta-llama/llama-4-scout-17b-16e-instruct   # optional
 ```
 
-Endpoint contract (multipart):
+Successful response:
 
-- Field: `image` (file, jpeg/png, max 5 MB)
-- Response 200:
-  ```json
-  {
-    "plate_text": "B 1234 CD",
-    "matches_format": true,
-    "confidence": 0.93,
-    "raw_text": "B 1234 CD",
-    "provider": "openai:gpt-4o-mini"
-  }
-  ```
-- Response 422 when the plate cannot be determined (body still includes `raw_text`, `normalized`, `provider`).
-- Response 422 also on invalid upload (wrong mime / > 5 MB).
-- Response 429 when rate-limited (5 req / minute / IP).
-- Response 502 when the upstream provider errors (timeout, quota, bad gateway).
+```json
+{
+  "plate_text": "B 1234 CD",
+  "matches_format": true,
+  "confidence": 0.93,
+  "raw_text": "B 1234 CD",
+  "provider": "openai:gpt-4o-mini"
+}
+```
+
+Returns `422` if the plate can't be read or the upload is invalid, `429` if you hit the rate limit (5 req/min/IP) and `502` if the upstream provider is down.
+
+## Routes
+
+| Method | Path | Auth |
+| ------ | ---- | ---- |
+| GET | `/` | public |
+| GET | `/login`, `/register` | public |
+| GET | `/employees` | required |
+| GET/POST | `/api/employees` | required |
+| GET/PUT/DELETE | `/api/employees/{id}` | required |
+| POST | `/api/ocr/plate` | public (rate-limited) |
+| POST | `/api/employees/ocr/plate` | required (rate-limited) |
 
 ## Validation
 
-All input validation lives server-side in FormRequests (`StoreEmployeeRequest`, `UpdateEmployeeRequest`). The Vue form has no HTML5 constraint attributes; messages render only when the API returns `422` with a `errors` payload.
+Validation is entirely server-side (`StoreEmployeeRequest`, `UpdateEmployeeRequest`). The Vue form has no HTML5 constraints. Errors only appear when the API sends back a `422`.
 
-Key rules:
+| Field | Rules |
+| ----- | ----- |
+| `name` | required, max 30 chars |
+| `nik` | required on create, exactly 10 chars, unique, it can't be changed after creation |
+| `birthdate` | required, must be at least 15 years ago |
+| `sex` | required, boolean |
+| `address` | optional, max 200 chars |
+| `salary` | required, numeric, >= 0 |
+| `currency` | optional, 3-letter ISO code (e.g. `USD`), defaults to `USD` |
+| `is_active` | optional, boolean, defaults to `true` |
 
-- `name`: required, string, max 30
-- `nik`: required on create, string, exactly 10 chars, unique; immutable on update
-- `birthdate`: required, date, at least 15 years ago
-- `sex`: required, boolean
-- `address`: nullable, string, max 200
-- `salary`: required, numeric, >= 0
-- `currency`: optional, string, exactly 3 alpha chars (e.g. `USD`); defaults to `USD`
-- `is_active`: optional, boolean; defaults to `true` on create
+## Architecture
+
+The app is structured around Clean / Hexagonal Architecture. The idea is that the core logic has no idea Laravel even exists.
+
+```
+HTTP layer       app/Http/                    thin controllers, FormRequests, Resources
+Application      app/Application/Employee/    use cases + DTOs — no framework imports
+Domain           app/Domain/Employee/         repository interface + exceptions (pure PHP)
+Infrastructure   app/Infrastructure/          EloquentEmployeeRepository — only DB code
+```
+
+`AppServiceProvider` wires up `EmployeeRepositoryInterface → EloquentEmployeeRepository`. `EmployeeNotFoundException` is caught globally in `bootstrap/app.php` and turned into a 404 — no try/catch needed in controllers.
+
+## Data model
+
+Employee IDs are auto-generated as `YYYYMM` + a 5-digit sequence (e.g. `20240600001`).
+
+| Column | Type | Notes |
+| ------ | ---- | ----- |
+| `id` | varchar(11) | auto-generated PK |
+| `name` | varchar(30) | |
+| `nik` | varchar(10) | unique, immutable |
+| `birthdate` | date | |
+| `sex` | boolean | true = M |
+| `address` | varchar(200) | nullable |
+| `salary` | numeric(12,4) | |
+| `currency` | varchar(3) | default `USD` |
+| `is_active` | boolean | default true |
+| `entry_date` | timestamp | created_at |
+| `update_date` | timestamp | updated_at |
 
 ## Tests
 
 ```bash
 php artisan test
-# or
-vendor/bin/phpunit
 ```
 
-## Useful commands
+Covers unit tests for all use cases (Mockery, zero DB I/O), the plate normalizer, feature tests for auth, full employee CRUD and profile management.
+
+## Handy commands
 
 ```bash
-npm run dev          # Vite dev server with HMR
-npm run build        # production build into public/build
-php artisan migrate:fresh --seed
-php artisan tinker
+npm run build                    # production asset build
+php artisan migrate:fresh --seed # reset + reseed the DB
+php artisan tinker               # REPL
 ```
 
-## Project layout
+## How things flow
 
-```
-app/
-  Http/Controllers/Api/   # JSON endpoints (EmployeeController, OcrController)
-  Http/Requests/          # StoreEmployeeRequest, UpdateEmployeeRequest
-  Http/Resources/         # EmployeeResource (shapes JSON output)
-  Models/Employee.php     # ID = YYYYMM + 5-digit seq (auto-generated)
-  Services/Ocr/           # PlateOcrDriver interface + Drivers/
-    Drivers/              # FakePlateDriver, OpenAiPlateDriver,
-                          # GeminiPlateDriver, GroqPlateDriver
-resources/js/
-  components/             # EmployeeApp, EmployeeForm, EmployeeDeleteConfirm,
-                          # PlateOcrUpload, AppModal, FormField
-  composables/            # useEmployeeList, useEmployeeDelete
-  helpers/                # format.js
-resources/views/          # Blade shells
-routes/
-  web.php                 # Web routes (SPA shell, profile, auth)
-  api.php                 # API routes (employees CRUD, OCR)
-database/migrations/      # Schema (employees, currency, indexes)
-database/seeders/         # Seed data
-```
+### 1. Auth
 
-## Flow & Process Note
+Breeze handles this. Visitors hit `/login` or `/register`, get a session cookie and land on `/employees`. That's it. The only public API route is `/api/ocr/plate`, everything else requires a session.
 
-One-page summary of the Employee App user + system flow.
+### 2. Employee CRUD
 
-### 1. Authentication
+`EmployeeApp.vue` drives the list view, search, sort and paginate all hit `GET /api/employees`. Opening the form modal calls `POST` or `PUT` depending on whether you're creating or editing. Delete goes through a confirm modal first.
 
-```
-Visitor -> /login (Breeze) -> session cookie -> /employees (SPA shell)
-```
+On the server side, the controller stays thin on purpose. It takes the request, builds a DTO, hands it to a use case and returns the result. The use case talks to `EmployeeRepositoryInterface` which `EloquentEmployeeRepository` implements. The use cases themselves don't know anything about HTTP or Eloquent, that's the whole point.
 
-Routes outside `auth` middleware: landing (`/`), Breeze auth pages, public OCR (`/api/ocr/plate`).
+When an employee isn't found, `EmployeeNotFoundException` bubbles up and the global handler in `bootstrap/app.php` turns it into a 404. No try/catch in the controller.
 
-### 2. Employee CRUD (SPA)
+Validation errors come back as `422 { errors: { field: [messages] } }`. The Vue form has no HTML5 constraints, it just renders whatever the server sends back.
 
-```
-EmployeeApp.vue (list)
-    │  GET /api/employees?search=&sort=&dir=&page=
-    ▼
-EmployeeForm.vue (modal)
-    │  POST   /api/employees           (create)
-    │  PUT    /api/employees/{id}      (update, NIK immutable)
-    │  DELETE /api/employees/{id}      (delete)
-    ▼
-EmployeeController (thin adapter)
-    │ StoreEmployeeRequest / UpdateEmployeeRequest — validation
-    │ builds DTO (CreateEmployeeData / UpdateEmployeeData)
-    ▼
-Use Case (Application layer)
-    │  ListEmployeesUseCase  / GetEmployeeUseCase
-    │  CreateEmployeeUseCase / UpdateEmployeeUseCase / DeleteEmployeeUseCase
-    │  all accept/return DTOs or domain objects — no HTTP knowledge
-    ▼
-EmployeeRepositoryInterface (Domain contract)
-    ▼
-EloquentEmployeeRepository (Infrastructure)
-    │  only Eloquent layer that touches the DB
-    ▼
-Employee model -> employees table (PostgreSQL)
-```
+### 3. OCR
 
-Error handling: `EmployeeNotFoundException` thrown by use cases is caught by the global exception handler in `bootstrap/app.php` and rendered as `{ message }` 404 — no try/catch in the controller.
+`PlateOcrUpload.vue` lets you pick an image. It POSTs to `/api/ocr/plate` (public) or `/api/employees/ocr/plate` (auth). The controller validates the upload, resolves the right driver from `OCR_PROVIDER`, calls it and returns the result. If it works, the form auto-fills the NIK and name fields.
 
-Validation strategy: the Vue form holds **no** HTML5 constraints. The server returns `422 { errors: { field: [msg] } }` and the form's `fieldError(key)` renders the first message under each input.
+The `fake` driver just returns a hardcoded response, it is useful for local dev and tests where you don't want real API calls. Swap to `openai`, `gemini` or `groq` when you actually need it to read something.
 
-### 3. OCR Plate / NIK Capture
+## Database and Test Data
 
-```
-PlateOcrUpload.vue
-    │ user picks image file
-    │ POST multipart /api/ocr/plate              (public, throttle:5,1)
-    │   or /api/employees/ocr/plate              (auth, throttle:5,1)
-    ▼
-OcrController::plate
-    │ validates: image (mimes:jpg,jpeg,png; max 5120 KB)
-    │ resolves OcrDriver from OCR_PROVIDER (.env)
-    ▼
-FakeDriver       -> returns canned { plate, raw }       (dev/tests)
-OpenAiDriver     -> POSTs image to OpenAI vision model  (OCR_PROVIDER=openai)
-GeminiDriver     -> POSTs image to Google Gemini vision  (OCR_PROVIDER=gemini)
-GroqDriver       -> POSTs image to Groq inference API    (OCR_PROVIDER=groq)
-    │
-    ▼
-JSON { plate, raw } -> EmployeeForm prefills NIK / name
-```
-
-OCR provider env vars:
-
-| Provider | Required env vars | Optional (model override) |
-| -------- | ----------------- | ------------------------- |
-| `fake`   | —                 | —                         |
-| `openai` | `OPENAI_API_KEY`  | `OPENAI_OCR_MODEL` (default: `gpt-4o-mini`) |
-| `gemini` | `GEMINI_API_KEY`  | `GEMINI_OCR_MODEL` (default: `gemini-2.0-flash`) |
-| `groq`   | `GROQ_API_KEY`    | `GROQ_OCR_MODEL` (default: `meta-llama/llama-4-scout-17b-16e-instruct`) |
-
-### 4. Data model (employees)
-
-| column      | type         | notes                                  |
-| ----------- | ------------ | -------------------------------------- |
-| id          | varchar(11)   | PK, YYYYMM + 5-digit seq (e.g. `20240600001`), auto-generated |
-| name        | varchar(30)   | indexed                                |
-| birthdate   | date          | indexed; must be >= 15y ago            |
-| sex         | boolean       | true=M, false=F                        |
-| address     | varchar(200)  | nullable                               |
-| salary      | numeric(12,4) | indexed                                |
-| currency    | varchar(3)    | default `USD`; 3-letter ISO code       |
-| nik         | varchar(10)   | unique, immutable post-create          |
-| is_active   | boolean       | default true                           |
-| entry_date  | timestamp     | created_at alias                       |
-| update_date | timestamp     | updated_at alias                       |
-
-### 5. Error & throttle map
-
-| Condition                       | Status | Body                              |
-| ------------------------------- | ------ | --------------------------------- |
-| Unauthenticated SPA API call    | 401    | `{ message }`                     |
-| Validation failure              | 422    | `{ message, errors: {...} }`      |
-| Missing resource                | 404    | `{ message }`                     |
-| OCR throttle exceeded           | 429    | `{ message }` + `Retry-After`     |
-| Server error                    | 500    | `{ message }` (debug off)         |
-
-## 6. Local dev cheatsheet
-
-```bash
-php artisan migrate:fresh --seed
-npm run dev
-php artisan serve
-# OCR_PROVIDER=fake by default — no external calls
-```
-
-### 7. Architecture layers (Clean / Hexagonal)
-
-```
-app/
-├── Domain/Employee/
-│   ├── EmployeeRepositoryInterface.php   # pure PHP contract
-│   └── Exceptions/
-│       └── EmployeeNotFoundException.php
-├── Application/Employee/
-│   ├── DTO/
-│   │   ├── EmployeeListCriteria.php
-│   │   ├── CreateEmployeeData.php
-│   │   └── UpdateEmployeeData.php
-│   ├── ListEmployeesUseCase.php
-│   ├── GetEmployeeUseCase.php
-│   ├── CreateEmployeeUseCase.php
-│   ├── UpdateEmployeeUseCase.php
-│   └── DeleteEmployeeUseCase.php
-├── Infrastructure/Persistence/
-│   └── EloquentEmployeeRepository.php   # implements Domain interface
-└── Http/
-    ├── Controllers/Api/EmployeeController.php  # thin adapter
-    ├── Requests/{Store,Update}EmployeeRequest.php
-    └── Resources/EmployeeResource.php
-```
-
-Binding: `AppServiceProvider::register()` — `EmployeeRepositoryInterface` → `EloquentEmployeeRepository`
-Exception handler: `bootstrap/app.php` — `EmployeeNotFoundException` → 404 JSON
-
-### 8. Test coverage snapshot
-
-`php artisan test` covering:
-
-- **Unit / Employee**: `ListEmployeesUseCaseTest`, `GetEmployeeUseCaseTest`, `CreateEmployeeUseCaseTest`, `DeleteEmployeeUseCaseTest` — use Mockery, BDD-style test names, zero DB I/O
-- **Unit / OCR**: `PlateNormalizerTest` — for normalize, matchesFormat, extractPlate
-- **Feature / Auth**: registration, login, password reset, email verification, password update
-- **Feature / Employee**: auth gate, search, sort, paginate, create (with currency), show, update (NIK immutable), delete, 404/422 paths
-- **Feature / Profile**: edit, update, delete account
+Sample database dumps and test data files are available here:
+[Google Drive – Database & Test Data](https://drive.google.com/drive/folders/1SFV8XwQhLJy8NcfAOmgzKE1ikUO-baKn?usp=sharing)
