@@ -27,7 +27,7 @@ services:
     container_name: employee-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "127.0.0.1:8082:80"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro

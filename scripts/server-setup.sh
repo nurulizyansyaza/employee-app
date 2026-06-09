@@ -59,9 +59,49 @@ else
 fi
 
 ###############################################################################
-# 3. Firewall (allow SSH + HTTP; Cloudflare Proxy handles HTTPS)
+# 3. Host nginx (reverse proxy — routes employee.nurulizyansyaza.com → Docker)
 ###############################################################################
-echo "[3/7] Configuring UFW..."
+echo "[3/8] Installing & configuring host nginx..."
+if ! command -v nginx >/dev/null 2>&1; then
+    apt-get install -y -qq nginx
+    systemctl enable nginx
+fi
+
+VHOST_FILE="/etc/nginx/sites-available/${DOMAIN}"
+cat > "${VHOST_FILE}" << VHOSTEOF
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    # Trust Cloudflare proxy IPs for real IP forwarding
+    set_real_ip_from 172.16.0.0/12;
+    set_real_ip_from 10.0.0.0/8;
+    real_ip_header CF-Connecting-IP;
+
+    location / {
+        proxy_pass         http://127.0.0.1:8082;
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+        client_max_body_size 50M;
+    }
+}
+VHOSTEOF
+
+ln -sf "${VHOST_FILE}" /etc/nginx/sites-enabled/
+# Remove default catch-all so unknown hosts don't fall through to wrong app
+rm -f /etc/nginx/sites-enabled/default
+
+nginx -t && systemctl reload nginx
+
+###############################################################################
+# 4. Firewall (allow SSH + HTTP; Cloudflare Proxy handles HTTPS)
+###############################################################################
+echo "[4/8] Configuring UFW..."
 ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
@@ -72,7 +112,7 @@ ufw --force enable
 ###############################################################################
 # 4. Runner user (+ docker group)
 ###############################################################################
-echo "[4/7] Creating runner user: ${RUNNER_USER}..."
+echo "[5/8] Creating runner user: ${RUNNER_USER}..."
 if ! id -u "${RUNNER_USER}" >/dev/null 2>&1; then
     useradd -m -s /bin/bash -G docker "${RUNNER_USER}"
 else
@@ -82,7 +122,7 @@ fi
 ###############################################################################
 # 5. Deploy directory + docker-compose.prod.yml + .env.production
 ###############################################################################
-echo "[5/7] Preparing ${DEPLOY_DIR}..."
+echo "[6/8] Preparing ${DEPLOY_DIR}..."
 mkdir -p "${DEPLOY_DIR}"
 
 # Fetch docker-compose.prod.yml from the repo (public-readable raw URL).
@@ -136,7 +176,7 @@ chown -R "${RUNNER_USER}:${RUNNER_USER}" "${DEPLOY_DIR}"
 ###############################################################################
 # 6. GitHub Actions self-hosted runner
 ###############################################################################
-echo "[6/7] Installing GitHub Actions runner v${RUNNER_VERSION}..."
+echo "[7/8] Installing GitHub Actions runner v${RUNNER_VERSION}..."
 if [ -d "${RUNNER_DIR}" ] && [ -f "${RUNNER_DIR}/.runner" ]; then
     echo "  Runner already configured at ${RUNNER_DIR} — skipping download/config."
 else
@@ -181,7 +221,7 @@ fi
 ###############################################################################
 # 7. Final reminders
 ###############################################################################
-echo "[7/7] Done with automated steps."
+echo "[8/8] Done with automated steps."
 echo ""
 echo "=========================================="
 echo " REMAINING MANUAL STEPS"
