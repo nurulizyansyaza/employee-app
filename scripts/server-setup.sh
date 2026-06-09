@@ -9,7 +9,7 @@
 #
 set -euo pipefail
 
-DEPLOY_DIR="/opt/employee-app"
+DEPLOY_DIR="/data/employee-app"
 RUNNER_USER="github-runner"
 RUNNER_DIR="/home/${RUNNER_USER}/actions-runner"
 RUNNER_VERSION="2.319.1"

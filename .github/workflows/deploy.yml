@@ -144,7 +144,7 @@ jobs:
       - name: Sync deploy assets to deploy directory
         run: |
           set -euo pipefail
-          DEPLOY_DIR="/opt/employee-app"
+          DEPLOY_DIR="/data/employee-app"
           mkdir -p "${DEPLOY_DIR}"
           install -m 0644 docker-compose.prod.yml "${DEPLOY_DIR}/docker-compose.prod.yml"
           rsync -rlpt --delete --no-group --no-owner docker/ "${DEPLOY_DIR}/docker/"
@@ -158,7 +158,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          DEPLOY_DIR="/opt/employee-app"
+          DEPLOY_DIR="/data/employee-app"
           SHA_TAG="sha-$(echo "${GIT_SHA}" | cut -c1-7)"
 
           echo "==> Logging into GitHub Container Registry"

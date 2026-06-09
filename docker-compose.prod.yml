@@ -1,3 +1,5 @@
+name: employee-app
+
 services:
   app:
     image: ${APP_IMAGE:-ghcr.io/nurulizyansyaza/employee-app:latest}
